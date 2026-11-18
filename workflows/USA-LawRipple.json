@@ -1,0 +1,332 @@
+{
+  "id": "FXQQy0ZddBLjD6II",
+  "name": "USA LawRipple",
+  "active": false,
+  "createdAt": "2026-09-24T10:15:31.502Z",
+  "updatedAt": "2026-10-02T15:26:23.024Z",
+  "isArchived": false,
+  "triggerCount": 0,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "427f0b77-3a34-4e89-a581-d8cf06d145fa",
+      "name": "TEST Manual (Mock)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 13 * * *"
+            }
+          ]
+        }
+      },
+      "id": "34e77bf2-0f2a-4e0c-aa7f-c794f0107596",
+      "name": "LIVE 9AM Florida ET",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -64,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{json: {law: \"CMS Final Rule Aug 11 2026 - Federal ban on Medicaid and CHIP funds for gender-affirming care for youth, effective Oct 13 2026\"}}, {json: {law: \"Texas TRAIGA Jan 1 2026 - Texas Responsible AI Governance Act bans discriminatory AI\"}}, {json: {law: \"Florida HB 991 SAVE Act April 1 2026 - Proof of citizenship required to vote\"}}];"
+      },
+      "id": "93bd62be-8171-4abb-9bf4-9c5befe23e29",
+      "name": "MOCK 3 Laws",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "url": "https://www.federalregister.gov/api/v1/documents.json?per_page=3&order=newest",
+        "options": {}
+      },
+      "id": "682ece51-1b51-4542-a08d-eb61fd70b00a",
+      "name": "LIVE Fetch Laws",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        224,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "id": "b7f4d4fb-78aa-4c3b-90c3-dc7afa07ec8c",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        448,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json; if(j.results) return j.results.slice(0,1).map(d=>({json:{law:d.title}})); return [{json:j}];"
+      },
+      "id": "cb70d733-d2f2-4659-b1da-5ba1272e3b0c",
+      "name": "Parse 1 Law",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "YOUR_VALUE"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://n8n.arupiautomates.cloud"
+            },
+            {
+              "name": "X-Title",
+              "value": "US Law Ripple"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "openai/gpt-4o-mini"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{\"role\": \"system\", \"content\": \"You are US Law Parser. Return JSON ONLY: {\\\"law\\\":\\\"title\\\", \\\"severity\\\":\\\"high\\\"} Do NOT ask for clarification.\"}, {\"role\": \"user\", \"content\": \"LAW: \" + ($('Parse 1 Law').item.json.law || $json.law)}] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "977b9a70-33ec-41d3-bb12-2a1986a9b252",
+      "name": "OpenRouter - Normalizer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        896,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "YOUR_VALUE"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://n8n.arupiautomates.cloud"
+            },
+            {
+              "name": "X-Title",
+              "value": "US Law Ripple"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "openai/gpt-4o"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{\"role\": \"system\", \"content\": \"You are US Law Ripple Engine. You MUST return 3 chain items always, no blanks. Format strictly: {\\\"law\\\":\\\"short title max 10 words\\\", \\\"chain\\\":[{\\\"order\\\":\\\"1st\\\",\\\"effect\\\":\\\"20 words\\\",\\\"who_feels_it\\\":\\\"who\\\"},{\\\"order\\\":\\\"2nd\\\",\\\"effect\\\":\\\"20 words\\\",\\\"who_feels_it\\\":\\\"who\\\"},{\\\"order\\\":\\\"3rd\\\",\\\"effect\\\":\\\"20 words\\\",\\\"who_feels_it\\\":\\\"who\\\"}], \\\"winners_losers\\\":{\\\"winners\\\":[\\\"2 items\\\"],\\\"losers\\\":[\\\"3 items\\\"]}, \\\"citizen_action\\\":\\\"1 sentence\\\", \\\"business_play\\\":\\\"1 sentence\\\"} NEVER leave who_feels_it empty. Return JSON only.\"}, {\"role\": \"user\", \"content\": \"LAW: \" + ($('Parse 1 Law').item.json.law || $json.law)}] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "242c0881-f052-41e0-90af-1ba00c213807",
+      "name": "OpenRouter - Ripple Engine",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nlet raw = input.choices?.[0]?.message?.content || input.text || JSON.stringify(input);\nconst m = raw.match(/\\{[\\s\\S]*\\}/);\nif (m) raw = m[0];\nlet p;\ntry { p = JSON.parse(raw); }\ncatch { return [{json: {text: `Parser Error:\\n${raw}`.slice(0,4000)}}]; }\n\nfunction clean(s){ return (s||'').replace(/([a-z])([A-Z])/g,'$1 $2').trim(); }\nconst chain = p.chain || [];\nconst c1 = chain[0] || {};\nconst c2 = chain[1] || {};\nconst c3 = chain[2] || {};\n\nconst text = `⚖️ <b>${clean(p.law)}</b>\n\n<b>RIPPLE EFFECT:</b>\n<b>1st (0-30d):</b> ${clean(c1.effect)}\n→ Who: ${clean(c1.who_feels_it)}\n\n<b>2nd (1-6mo):</b> ${clean(c2.effect)}\n→ Who: ${clean(c2.who_feels_it)}\n\n<b>3rd (6-24mo):</b> ${clean(c3.effect)}\n→ Who: ${clean(c3.who_feels_it)}\n\n🏆 Winners: ${(p.winners_losers?.winners||[]).join(', ')}\n💔 Losers: ${(p.winners_losers?.losers||[]).join(', ')}\n\n👨‍💼 DO: ${clean(p.citizen_action)}\n💰 PLAY: ${clean(p.business_play)}`;\n\nreturn [{json: {text}}];\n"
+      },
+      "id": "08a91724-ee77-443a-a0be-2b959e71c0ca",
+      "name": "Format Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_CHATID",
+        "text": "= {{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "0d5ee1f4-21f6-43bd-ab8b-31d85d223a49",
+      "name": "Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1568,
+        224
+      ]
+    }
+  ],
+  "connections": {
+    "TEST Manual (Mock)": {
+      "main": [
+        [
+          {
+            "node": "MOCK 3 Laws",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LIVE 9AM Florida ET": {
+      "main": [
+        [
+          {
+            "node": "LIVE Fetch Laws",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MOCK 3 Laws": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LIVE Fetch Laws": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Parse 1 Law",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse 1 Law": {
+      "main": [
+        [
+          {
+            "node": "OpenRouter - Normalizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter - Normalizer": {
+      "main": [
+        [
+          {
+            "node": "OpenRouter - Ripple Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter - Ripple Engine": {
+      "main": [
+        [
+          {
+            "node": "Format Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Alert": {
+      "main": [
+        [
+          {
+            "node": "Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
