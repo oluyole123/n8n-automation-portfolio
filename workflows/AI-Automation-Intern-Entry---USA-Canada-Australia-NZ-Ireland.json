@@ -1,0 +1,215 @@
+{
+  "id": "YxqyA07qMdbGII9Z",
+  "name": "AI Automation Intern Entry - USA Canada Australia NZ Ireland",
+  "active": false,
+  "createdAt": "2026-09-18T15:31:00.781Z",
+  "updatedAt": "2026-10-04T22:05:16.655Z",
+  "isArchived": false,
+  "triggerCount": 0,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "4a43bf67-c337-4a7c-8432-dad34af9396c",
+      "name": "Schedule 8am WAT (7am UTC)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://remoteok.com/api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "59c9d024-2be5-433a-957e-9eb4776a9706",
+      "name": "RemoteOK API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://remotive.com/api/remote-jobs?category=software-dev&search=automation",
+        "options": {}
+      },
+      "id": "db6a2989-9ace-41de-99c3-d6b7cc17cd67",
+      "name": "Remotive API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.arbeitnow.com/api/job-board-api",
+        "options": {}
+      },
+      "id": "b3460b5a-6f36-4c93-a741-8d5d69f274e8",
+      "name": "Arbeitnow API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobs = $input.all().map(i => i.json);\n\nconst ENTRY = ['intern', 'entry', 'junior', 'graduate', 'trainee', 'jr ', 'jr.', 'entry-level'];\nconst AUTO = ['ai automation', 'automation', 'n8n', 'low-code', 'low code', 'no-code', 'zapier', 'make.com', 'ai agent', 'ai workflow', 'workflow automation'];\n\nfunction scoreJob(j) {\n  const text = `${j.position || ''} ${j.tags || ''} ${j.company || ''}`.toLowerCase();\n  const isEntry = ENTRY.some(k => text.includes(k));\n  const isAuto = AUTO.some(k => text.includes(k));\n  \n  let score = 0;\n  if (isEntry && isAuto) score = 3; // Majorly wanted\n  else if (isAuto) score = 2;       // Any role in AI Automation\n  else if (isEntry) score = 1;      // Any entry role\n  \n  return { job: j, score, isEntry, isAuto, text };\n}\n\nconst scored = jobs.map(scoreJob).filter(s => s.score > 0);\n\n// Sort by priority: 3 > 2 > 1\nscored.sort((a, b) => b.score - a.score);\n\nreturn scored.slice(0, 20).map(s => {\n  const j = s.job;\n  let type = '';\n  if (s.score === 3) type = 'Entry/Intern - AI Automation [TOP MATCH]';\n  if (s.score === 2) type = 'Any Role - AI Automation';\n  if (s.score === 1) type = 'Entry/Intern - General';\n\n  return {\n    json: {\n      company: j.company,\n      role: j.position,\n      location: (j.location || 'Remote') + ' - Worldwide',\n      url: j.url,\n      source: j.source || j.url,\n      tags: j.tags,\n      code: type,\n      isWorldwide: true,\n      priority: s.score\n    }\n  };\n});"
+      },
+      "id": "7af4e77c-0067-42dc-9c40-b6645aa0948a",
+      "name": "Filter - Intern Entry AI Automation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        192
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_CHATID",
+        "text": "={{ $json.company }} - {{ $json.role }}\n📍 {{ $json.location }}\n🏷️ {{ $json.code }}\n\n🔗 {{ $json.url }}\nSource: {{ $json.source }}",
+        "additionalFields": {}
+      },
+      "id": "89000c82-3135-427d-a633-42696bf6ac2d",
+      "name": "Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        448,
+        176
+      ],
+      "id": "ce7826c6-ad83-4c3a-ade1-fd853618dfd9",
+      "name": "Merge"
+    }
+  ],
+  "connections": {
+    "Schedule 8am WAT (7am UTC)": {
+      "main": [
+        [
+          {
+            "node": "RemoteOK API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Remotive API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Arbeitnow API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RemoteOK API": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remotive API": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Arbeitnow API": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Filter - Intern Entry AI Automation": {
+      "main": [
+        [
+          {
+            "node": "Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Alert": {
+      "main": [
+        []
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Filter - Intern Entry AI Automation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": []
+}
