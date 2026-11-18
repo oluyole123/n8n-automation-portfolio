@@ -1,0 +1,208 @@
+{
+  "id": "QK1uzUt7HWs23qwL",
+  "name": "Canada Grad School Fee Waivers, Scholarships and Funding to Telegram",
+  "active": false,
+  "createdAt": "2026-11-11T21:38:08.424Z",
+  "updatedAt": "2026-11-11T21:48:06.149Z",
+  "isArchived": false,
+  "triggerCount": 0,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "2586679c-49ed-4c2f-b1a3-3b5f32a08a5e",
+      "name": "Weekly Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const queries = [\n  'Canadian universities application fee waiver for graduate (masters and PhD) programs, international applicants, 2027 intake',\n  'Canadian university graduate application fee waiver request for applicants from Africa, Nigeria or developing countries',\n  'graduate application fee waiver at University of Toronto, UBC, McGill, Waterloo, Alberta, Calgary, Dalhousie, Queens, Western, McMaster, Ottawa, Simon Fraser',\n  'scholarships for international graduate students (masters and PhD) at Canadian universities, 2027 intake, deadlines',\n  'fully funded masters and PhD programs in Canada for international students, assistantships and guaranteed funding packages, 2026-2027',\n  'graduate scholarships and fellowships in Canada open to students from Africa and Nigeria, 2026-2027'\n];\nreturn queries.map(q => ({ json: { query: q } }));"
+      },
+      "id": "59ba9f56-8ebd-426b-a57f-5bcff69d82b7",
+      "name": "Build Search Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.query }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a research assistant with live web search. Find opportunities at Canadian universities for graduate school (master and PhD) applicants of three types: (1) Application fee waiver, where the fee charged to submit the application is waived or exempted; (2) Scholarship, a named scholarship, fellowship or award for graduate students; (3) Funding, graduate funding such as assistantships, stipends or guaranteed funding packages. Do not include reduced fees, or fees for other things such as transcripts or deposits. Return ONLY a JSON array, with no prose and no markdown fences, of up to 10 objects with these keys: university, province, level (Masters, PhD or Both), type (exactly one of: Application fee waiver, Scholarship, Funding), title (name of the scholarship, fellowship or program, or Application fee waiver), details (amount, coverage and conditions), eligibility (who qualifies, including whether international students are eligible), deadline (or Not stated), url (the official university or funder page that states it). Only include opportunities in Canada that are confirmed by an official university or funder page. Prefer information current for the 2026-2027 and 2027 intakes. If you find nothing, return []."
+            }
+          ]
+        },
+        "batching": {
+          "batchSize": 1,
+          "delayBetweenBatches": 1500
+        }
+      },
+      "id": "8383c60c-5a2b-4c61-a07b-6f3f653260dd",
+      "name": "Search Web for Fee Waivers",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        768,
+        304
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "perplexity/sonar",
+        "options": {
+          "temperature": 0,
+          "timeout": 120000
+        }
+      },
+      "id": "8fee3254-45a8-432d-9b50-f43ce0414c69",
+      "name": "Perplexity Sonar (OpenRouter)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        768,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sd = $getWorkflowStaticData('global');\nsd.seen = sd.seen || {};\nconst esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst attr = s => esc(s).replace(/\"/g, '&quot;');\nconst order = { 'application fee waiver': 0, 'scholarship': 1, 'funding': 2 };\nconst rank = t => (order[t.toLowerCase()] === undefined ? 9 : order[t.toLowerCase()]);\nconst found = [];\nconst runKeys = {};\nfor (const item of $input.all()) {\n  const content = item.json && (item.json.text || item.json.output);\n  if (!content) continue;\n  let arr = [];\n  try {\n    const m = String(content).match(/\\[[\\s\\S]*\\]/);\n    arr = JSON.parse(m ? m[0] : content);\n  } catch (e) { continue; }\n  if (!Array.isArray(arr)) continue;\n  for (const r of arr) {\n    if (!r || !r.url || !/^https?:\\/\\//i.test(r.url)) continue;\n    const type = String(r.type || 'Other').trim();\n    const key = r.university ? 'u:' + String(r.university).trim().toLowerCase() + '|' + type.toLowerCase() + '|' + String(r.title || '').trim().toLowerCase() : 'l:' + String(r.url).split('#')[0].toLowerCase();\n    if (sd.seen[key] || runKeys[key]) continue;\n    runKeys[key] = true;\n    found.push({ key: key, type: type, r: r });\n  }\n}\nif (!found.length) return [];\nfound.sort((a, b) => rank(a.type) - rank(b.type));\nfor (const f of found) sd.seen[f.key] = Date.now();\nconst header = '<b>Canada grad school fee waivers, scholarships and funding: ' + found.length + ' new</b>\\n\\n';\nconst blocks = found.map(f => {\n  const r = f.r;\n  let b = '<b>' + esc(r.university) + '</b>';\n  if (r.province) b += ' (' + esc(r.province) + ')';\n  if (r.level) b += ' - ' + esc(r.level);\n  b += '\\n[' + esc(f.type) + ']';\n  if (r.title) b += ' ' + esc(r.title);\n  b += '\\n';\n  const d = r.details || r.waiver_details;\n  if (d) b += 'Details: ' + esc(d) + '\\n';\n  if (r.eligibility) b += 'Who: ' + esc(r.eligibility) + '\\n';\n  if (r.deadline) b += 'Deadline: ' + esc(r.deadline) + '\\n';\n  b += '<a href=\"' + attr(r.url) + '\">Official page</a>\\n';\n  return b;\n});\nconst footer = '\\nAlways confirm terms, amounts and deadlines on the official page before applying.';\nconst msgs = [];\nlet cur = header;\nfor (const b of blocks) {\n  if ((cur + b).length > 3500) { msgs.push(cur); cur = ''; }\n  cur += b + '\\n';\n}\ncur += footer;\nmsgs.push(cur);\nreturn msgs.map(m => ({ json: { message: m } }));"
+      },
+      "id": "2c265605-7f7e-40f7-8557-6c101cc20841",
+      "name": "Parse, Dedupe and Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_CHATID",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "26060545-2f01-4977-b2ba-a304570de47c",
+      "name": "Send to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1280,
+        304
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "88790633-7840-4677-ba13-3c407a669f24",
+      "name": "Manual Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        432
+      ]
+    }
+  ],
+  "connections": {
+    "Weekly Schedule": {
+      "main": [
+        [
+          {
+            "node": "Build Search Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Search Queries": {
+      "main": [
+        [
+          {
+            "node": "Search Web for Fee Waivers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Web for Fee Waivers": {
+      "main": [
+        [
+          {
+            "node": "Parse, Dedupe and Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perplexity Sonar (OpenRouter)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Search Web for Fee Waivers",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse, Dedupe and Format": {
+      "main": [
+        [
+          {
+            "node": "Send to Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Test": {
+      "main": [
+        [
+          {
+            "node": "Build Search Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
