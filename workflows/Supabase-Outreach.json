@@ -1,0 +1,312 @@
+{
+  "id": "ebPMHbMi0e98pFvT",
+  "name": "Supabase Outreach",
+  "active": false,
+  "createdAt": "2026-09-25T16:43:56.136Z",
+  "updatedAt": "2026-09-25T17:53:02.363Z",
+  "isArchived": false,
+  "triggerCount": 0,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "d0c8003d-75da-4480-8b06-f390b0ddf8f5",
+      "name": "Schedule Trigger - Daily 9AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1808,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "domain": "techcrunch.com",
+        "limit": 10,
+        "filters": {}
+      },
+      "id": "33b4c503-4793-4073-8d47-6a1b5e9624e6",
+      "name": "Hunter.io - Domain Search",
+      "type": "n8n-nodes-base.hunter",
+      "typeVersion": 1,
+      "position": [
+        -1584,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "outreach_leads",
+        "limit": 1,
+        "orderBy": "created_at.asc",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "queued"
+            }
+          ]
+        }
+      },
+      "id": "2806f93a-6709-4cad-80c8-5644dd74d94b",
+      "name": "Supabase - Get Queued Leads",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1360,
+        192
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "outreach_leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "=   ={{ $json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "processing"
+            },
+            {
+              "fieldId": "claimed_at",
+              "fieldValue": "={{ $now }}"
+            }
+          ]
+        }
+      },
+      "id": "3467ec35-89ba-4edc-b9b6-81ff53f99203",
+      "name": "CLAIM LEAD API - Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1136,
+        192
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "contacted"
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "56e8475c-8ade-4856-b14b-9b94f3233193",
+      "name": "ALREADY CONTACTED - Skip",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "=     ={{ $json.email }}",
+        "subject": "=     ={{ $json.subject || \"Quick intro - \" + $json.company_name }}",
+        "message": "=     ={{ $json.body }}",
+        "options": {}
+      },
+      "id": "3f83b8a0-0f32-42ff-98e8-e3d4f6f048b0",
+      "name": "GMAIL - Send Outreach Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -688,
+        96
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "outreach_leads",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "sent"
+            },
+            {
+              "fieldId": "sent_at",
+              "fieldValue": "={{ $now }}"
+            }
+          ]
+        }
+      },
+      "id": "2519e89e-1ad8-4430-bdac-8348e09c893d",
+      "name": "MARK SENT - Upsert a Record",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "outreach_leads",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "failed"
+            },
+            {}
+          ]
+        }
+      },
+      "id": "18749279-29a9-4643-9efd-27b4bb302c06",
+      "name": "MARK SEND FAILED - Upsert a Record",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        192
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "2be2bffa-63c0-4205-99d1-713e9d757b65",
+      "name": "SKIP",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        288
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger - Daily 9AM": {
+      "main": [
+        [
+          {
+            "node": "Hunter.io - Domain Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hunter.io - Domain Search": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Get Queued Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Get Queued Leads": {
+      "main": [
+        [
+          {
+            "node": "CLAIM LEAD API - Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CLAIM LEAD API - Supabase": {
+      "main": [
+        [
+          {
+            "node": "ALREADY CONTACTED - Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ALREADY CONTACTED - Skip": {
+      "main": [
+        [
+          {
+            "node": "SKIP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GMAIL - Send Outreach Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GMAIL - Send Outreach Email": {
+      "main": [
+        [
+          {
+            "node": "MARK SENT - Upsert a Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "MARK SEND FAILED - Upsert a Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
