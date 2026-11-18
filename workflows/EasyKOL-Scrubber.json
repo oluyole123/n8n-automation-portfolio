@@ -1,0 +1,258 @@
+{
+  "id": "IsvZIJrKJGhPgNr0",
+  "name": "EasyKOL Scrubber",
+  "active": false,
+  "createdAt": "2026-09-15T04:00:01.228Z",
+  "updatedAt": "2026-11-18T08:36:21.865Z",
+  "isArchived": false,
+  "triggerCount": 0,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "your-webhook-path",
+        "options": {}
+      },
+      "id": "c683870b-c7ea-4a4f-b9f1-724d90ff9234",
+      "name": "Webhook: Upload Excel",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "f6149137-c9f0-4598-84f2-23054c350a4d",
+      "name": "Spreadsheet: Read Excel",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "master_leads",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "first_name",
+              "fieldValue": "={{$json.first_name}}"
+            },
+            {
+              "fieldId": "last_name",
+              "fieldValue": "={{$json.last_name}}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.email }}"
+            },
+            {
+              "fieldId": "profile_link",
+              "fieldValue": "={{ $json.profile_link }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $json.description }}"
+            },
+            {
+              "fieldId": "niche",
+              "fieldValue": "={{$json.niche}}"
+            },
+            {
+              "fieldId": "fingerprint",
+              "fieldValue": "={{$json.fp}}"
+            },
+            {
+              "fieldId": "date_added",
+              "fieldValue": "={{$now}}"
+            }
+          ]
+        }
+      },
+      "id": "dc6de5c1-914b-4a23-80a3-afc31c8c01de",
+      "name": "Supabase: Save + Auto Dedupe",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        832,
+        -48
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "content-type",
+                "value": "text/csv"
+              },
+              {
+                "name": "content-Disposition",
+                "value": "attachment;filename=\"leads.csv\""
+              },
+              {
+                "name": "Response Body",
+                "value": "={{$json.csv_data}}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "dc3cf9e4-1979-40f3-a5c1-21d8ed99a0a4",
+      "name": "Webhook Response: Return CSV",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1376,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b8f55acd-9607-4185-a366-653f9d2bb8ba",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        624,
+        192
+      ],
+      "id": "49b5f950-c7f1-4982-bfe6-30847ef85fff",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "options": {
+          "delimiter": ",",
+          "fileName": "leads.csv",
+          "headerRow": "={{ true }}"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1056,
+        -48
+      ],
+      "id": "2acb5c5a-1406-4548-b9ed-8bd770fa3d59",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "jsCode": "const clean = (v) => String(v ?? '').replace(/\\s+/g, ' ').trim();\nconst emailRe = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/;\nconst urlRe = /https?:\\/\\/[^\\s,;]+/i;\n\nconst seen = new Set();\nconst results = [];\n\nfor (const item of $input.all()) {\n  const j = item.json;\n\n  const fullName = clean(j['Nickname']);\n  const nameParts = fullName.split(' ');\n  const first_name = nameParts[0] || '';\n  const last_name = nameParts.slice(1).join(' ');\n\n  const description = clean(j['Description']);\n  const ai_tags = clean(j['AI Tags']);\n  const combined = `${description} ${ai_tags}`;\n\n  const email = ((combined.match(emailRe) || [''])[0]).toLowerCase();\n  const profile_url = (combined.match(urlRe) || [''])[0];\n\n  const dedupe_key = (email || fullName).toLowerCase();\n\n  let is_valid = Boolean(fullName) && Boolean(description || ai_tags);\n  if (is_valid && seen.has(dedupe_key)) is_valid = false;\n  if (is_valid) seen.add(dedupe_key);\n\n  results.push({\n    json: {\n      full_name: fullName,\n      first_name,\n      last_name,\n      description,\n      ai_tags,\n      email,\n      profile_url,\n      dedupe_key,\n      is_valid,\n    },\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        -48
+      ],
+      "id": "1a1bd11d-897f-4e33-ab83-c6e095637a81",
+      "name": "function code"
+    }
+  ],
+  "connections": {
+    "Webhook: Upload Excel": {
+      "main": [
+        [
+          {
+            "node": "Spreadsheet: Read Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Spreadsheet: Read Excel": {
+      "main": [
+        [
+          {
+            "node": "function code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Save + Auto Dedupe": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Save + Auto Dedupe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response: Return CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "function code": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
