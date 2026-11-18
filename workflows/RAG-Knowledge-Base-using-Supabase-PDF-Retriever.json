@@ -1,0 +1,432 @@
+{
+  "id": "fDxlKRKESrguFIQg",
+  "name": "RAG Knowledge Base using Supabase (PDF Retriever)",
+  "active": false,
+  "createdAt": "2026-09-14T19:07:56.522Z",
+  "updatedAt": "2026-09-22T12:37:49.658Z",
+  "isArchived": false,
+  "triggerCount": 0,
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "rag_documents",
+          "mode": "list",
+          "cachedResultName": "rag_documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        0
+      ],
+      "id": "629051c6-3fef-41fb-b71b-b4286cc22dc1",
+      "name": "Supabase Vector Store"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "your-webhook-path",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -32,
+        208
+      ],
+      "id": "c679950e-5538-4e47-855f-30abd68d5d8e",
+      "name": "Webhook - Ingest PDF",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "textSplittingMode": "custom",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        224
+      ],
+      "id": "fd0e41e8-c877-4833-9ecd-d62417c31a62",
+      "name": "PDF Document Loader"
+    },
+    {
+      "parameters": {
+        "chunkSize": 1500,
+        "chunkOverlap": 150
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        400,
+        432
+      ],
+      "id": "48cd3b0d-7c68-41a2-8a54-b4661f509ddf",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        912,
+        208
+      ],
+      "id": "1845eac8-6af6-43c2-b815-55847725ee45",
+      "name": "Respond — Ingest Done"
+    },
+    {
+      "parameters": {
+        "jsCode": "const docCount = $input.all().length;\nreturn [{\n  json: {\n    status: 'success',\n    chunks_stored: docCount,\n    message: `Successfully ingested and vectorized into ${docCount} chunks.`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        208
+      ],
+      "id": "8e51caff-e40b-4120-ba52-b9ddaca84eaa",
+      "name": "Code — Ingest Summary",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        192,
+        224
+      ],
+      "id": "416eb657-f576-4071-a9e5-3288867b6861",
+      "name": "OpenAI Embeddings — Ingest"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "your-webhook-path",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -32,
+        960
+      ],
+      "id": "6c82224b-b1f8-4325-8f26-abf02857291f",
+      "name": "Webhook — Ask a Question",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json?.body || $input.first().json;\nconst question = (body.question || '').trim();\n\nif (!question) {\n  throw new Error('Missing field: send { \"question\": \"your query here\" } in the POST body.');\n}\n\nreturn [{ json: { question, received_at: new Date().toISOString() } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        960
+      ],
+      "id": "e2366464-5a8a-4d86-9300-a2a1cbc720eb",
+      "name": "Code — Parse & Validate Question",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.question }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainRetrievalQa",
+      "typeVersion": 1.7,
+      "position": [
+        448,
+        960
+      ],
+      "id": "deed8f68-9ffb-4321-bf97-2b45314ca5d5",
+      "name": "Retrieval QA Chain — Answer"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 700,
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        416,
+        1184
+      ],
+      "id": "0fa0ddea-1c0e-4c4e-8fdf-845dc1a94b44",
+      "name": "OpenAI — GPT-4o Mini"
+    },
+    {
+      "parameters": {
+        "tableName": {
+          "__rl": true,
+          "value": "rag_documents",
+          "mode": "list",
+          "cachedResultName": "rag_documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        544,
+        1392
+      ],
+      "id": "e095adf9-cc9a-48e9-8240-b2daf78bcf40",
+      "name": "Supabase Vector Store - Retrieval"
+    },
+    {
+      "parameters": {
+        "jsCode": "const answer = $input.first().json.response || '';\nconst question = $('Code — Parse & Validate Question').first().json.question;\n\nconst notFound   = answer.startsWith('❌');\nconst partial    = answer.startsWith('⚠️');\nconst hasCite    = answer.includes('📄 Source:');\nconst wordCount  = answer.split(/\\s+/).filter(Boolean).length;\n\nconst debugFlags = [];\n\nif (!hasCite && !notFound) debugFlags.push('missing_citation');\nif (wordCount < 15) debugFlags.push('very_short_answer');\nif (answer.toLowerCase().includes('i don\\'t know') && !notFound)\n  debugFlags.push('hallucinated_fallback');\n\nconst httpStatus = notFound ? 404 : 200; // ternary operator \n\n\nreturn [{\n  json: {\n    question,\n    answer,\n    status: notFound ? 'not_found' : (partial ? 'partial' : 'ok'),\n    has_citation: hasCite,\n    http_status: httpStatus,\n    debug: debugFlags.length > 0 ? debugFlags : undefined,\n    answered_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        960
+      ],
+      "id": "9149ba66-7c87-40cc-a1a3-ef4c61cb95a2",
+      "name": "Code — Fallback & Debug Handler",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        624,
+        1600
+      ],
+      "id": "249106d5-fec3-472c-aa6c-4f891d759cad",
+      "name": "OpenAI Embeddings — Query"
+    },
+    {
+      "parameters": {
+        "topK": 5
+      },
+      "type": "@n8n/n8n-nodes-langchain.retrieverVectorStore",
+      "typeVersion": 1,
+      "position": [
+        544,
+        1184
+      ],
+      "id": "dcfa08d8-fb3d-4f4d-8546-626825c407fd",
+      "name": "Vector Store Retriever — Top K"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": "={{ $json.http_status || 200 }}"
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1136,
+        960
+      ],
+      "id": "ba19c4a8-3a28-44c9-899d-6056ef7eb711",
+      "name": "Respond — Answer"
+    }
+  ],
+  "connections": {
+    "Webhook - Ingest PDF": {
+      "main": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "PDF Document Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Code — Ingest Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Ingest Summary": {
+      "main": [
+        [
+          {
+            "node": "Respond — Ingest Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Embeddings — Ingest": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook — Ask a Question": {
+      "main": [
+        [
+          {
+            "node": "Code — Parse & Validate Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Parse & Validate Question": {
+      "main": [
+        [
+          {
+            "node": "Retrieval QA Chain — Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI — GPT-4o Mini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Retrieval QA Chain — Answer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store - Retrieval": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Vector Store Retriever — Top K",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieval QA Chain — Answer": {
+      "main": [
+        [
+          {
+            "node": "Code — Fallback & Debug Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Embeddings — Query": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store - Retrieval",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vector Store Retriever — Top K": {
+      "ai_retriever": [
+        [
+          {
+            "node": "Retrieval QA Chain — Answer",
+            "type": "ai_retriever",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Fallback & Debug Handler": {
+      "main": [
+        [
+          {
+            "node": "Respond — Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
